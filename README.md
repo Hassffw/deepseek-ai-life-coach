@@ -23,6 +23,9 @@ The following commands can be used:
 /help - Show this message
 /coaching - Start a coaching session
 
+Example Message:
+![image](https://github.com/user-attachments/assets/be8d75c1-4e2d-4642-85c4-aa9e3f0ce989)
+
 
 Get DEEPSEEK API KEY from:
 https://platform.deepseek.com/api_keys
