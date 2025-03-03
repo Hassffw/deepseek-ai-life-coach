@@ -1,0 +1,4 @@
+python-dotenv
+openai
+psycopg2-binary
+python-telegram-bot[job-queue]==20.8
