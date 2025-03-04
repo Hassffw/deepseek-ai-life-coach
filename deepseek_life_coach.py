@@ -326,10 +326,35 @@ class LifeCoachBot:
         user_id = str(update.effective_user.id)
         user_profile = self.get_user_profile(user_id)
 
-        # Rate limiting and actual coaching session logic remain the same
-        # ...
+        last_coaching_time = user_profile.get('last_coaching')
+        if last_coaching_time and datetime.now() - datetime.fromisoformat(last_coaching_time) < COACHING_RATE_LIMIT:
+            time_left = COACHING_RATE_LIMIT - (datetime.now() - datetime.fromisoformat(last_coaching_time))
+            minutes_left = int(time_left.total_seconds() / 60)
+            await update.message.reply_text(f"Please wait {minutes_left} minutes before starting another coaching session.")
+            return
 
-        # No state change needed for coaching as it doesn't require follow-up input after command
+        try:
+            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing") 
+            cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            cursor.execute("SELECT goal_text FROM goals WHERE user_id = %s", (user_id,))
+            goals = cursor.fetchall()
+            goals_text = "\n".join([goal['goal_text'] for goal in goals])
+
+            prompt = f"""
+                User initiated a coaching session.
+                User's previous goals: {goals_text}
+
+                Please start a brief, empathetic and encouraging coaching session, referring to the user's goals. Ask how they are feeling and what they would like to focus on in this session.
+            """
+            response = await self.deepseek.generate_response(prompt)
+            await update.message.reply_text(response)
+
+            user_profile['last_coaching'] = datetime.now().isoformat()
+            self.save_user_profile(user_id, user_profile)
+
+        except Exception as e:
+            logger.error(f"Error starting coaching session: {e}")
+            await update.message.reply_text("Sorry, I encountered an error starting the coaching session. Please try again later.")
 
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = str(update.effective_user.id)
@@ -672,6 +697,7 @@ class LifeCoachBot:
 
         else: # user_state == 'idle' - DEFAULT MESSAGE HANDLING (IDLE STATE)
             try:
+                await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing") 
                 cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
                 cursor.execute("SELECT goal_text FROM goals WHERE user_id = %s", (user_id,))
                 goals = cursor.fetchall()
